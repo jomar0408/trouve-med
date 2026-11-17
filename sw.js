@@ -1,16 +1,17 @@
 // Service worker TrouveMed : met l'application en cache pour l'ouvrir hors ligne
-const CACHE = "trouvemed-v1";
+const CACHE = "trouvemed-v2";
 const FICHIERS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
   "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
 ];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FICHIERS)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FICHIERS)).catch(() => {}));
   self.skipWaiting();
 });
 
@@ -21,9 +22,11 @@ self.addEventListener("activate", e => {
   self.clients.claim();
 });
 
-// Réseau d'abord (pour avoir la dernière version), cache si hors ligne
+// Réseau d'abord (dernière version), cache si hors ligne.
+// Les appels à Supabase (données en direct) ne sont jamais mis en cache.
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET") return;
+  const url = new URL(e.request.url);
+  if (e.request.method !== "GET" || url.hostname.endsWith("supabase.co")) return;
   e.respondWith(
     fetch(e.request)
       .then(rep => {
@@ -33,4 +36,12 @@ self.addEventListener("fetch", e => {
       })
       .catch(() => caches.match(e.request))
   );
+});
+
+// Clic sur une notification : ouvrir l'application
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({type: "window"}).then(liste =>
+    liste.length ? liste[0].focus() : clients.openWindow("./")
+  ));
 });

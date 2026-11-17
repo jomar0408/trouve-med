@@ -10,17 +10,20 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --vert:#0f766e; --vert-clair:#ccfbf1; --rouge:#b91c1c; --rouge-clair:#fee2e2;
-    --orange:#c2410c; --fond:#f1f5f4; --carte:#ffffff; --texte:#1f2937; --gris:#6b7280; --bord:#e5e7eb;
+    --fond:#f1f5f4; --carte:#ffffff; --texte:#1f2937; --gris:#6b7280; --bord:#e5e7eb;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--fond);color:var(--texte)}
   header{background:var(--vert);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:10}
-  header h1{margin:0;font-size:1.3rem}
+  header h1{margin:0;font-size:1.3rem;display:flex;align-items:center;gap:8px}
   header small{opacity:.85}
+  .etat{font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.2)}
+  .etat.ok{background:#22c55e}
   .modes{display:flex;gap:8px;margin-top:10px}
   .modes button{flex:1;padding:9px;border:0;border-radius:10px;background:rgba(255,255,255,.18);color:#fff;font-weight:600;cursor:pointer}
   .modes button.actif{background:#fff;color:var(--vert)}
@@ -28,10 +31,11 @@
   .carte{background:var(--carte);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
   .carte h2{margin:0 0 12px;font-size:1.05rem}
   label{display:block;font-size:.85rem;color:var(--gris);margin:10px 0 4px}
-  input,select,textarea{width:100%;padding:10px;border:1px solid var(--bord);border-radius:10px;font-size:1rem;font-family:inherit}
+  input,select{width:100%;padding:10px;border:1px solid var(--bord);border-radius:10px;font-size:1rem;font-family:inherit;background:#fff}
   .ligne{display:flex;gap:8px;align-items:center}
   .ligne > *{flex:1}
   button.btn{padding:10px 14px;border:0;border-radius:10px;background:var(--vert);color:#fff;font-weight:600;cursor:pointer;font-size:.95rem}
+  button.btn:disabled{opacity:.5}
   button.btn.sec{background:#e6f4f1;color:var(--vert)}
   button.btn.rouge{background:var(--rouge)}
   button.btn.petit{padding:6px 10px;font-size:.85rem}
@@ -42,6 +46,7 @@
   .check input{width:auto}
   .apercu{max-width:120px;border-radius:8px;margin-top:8px;display:block}
   .demande{border:1px solid var(--bord);border-radius:12px;padding:12px;margin-bottom:12px}
+  .demande.nouvelle{border-color:var(--vert);box-shadow:0 0 0 2px var(--vert-clair)}
   .demande-tete{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .tag{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;margin-right:4px}
   .tag.urgent{background:var(--rouge-clair);color:var(--rouge)}
@@ -55,22 +60,22 @@
   .points{background:var(--vert-clair);color:var(--vert);border-radius:12px;padding:10px 14px;font-weight:600;margin-bottom:14px}
   .bandeau{background:#fef3c7;color:#92400e;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-weight:600}
   .chat{background:#f9fafb;border-radius:10px;padding:8px;margin-top:8px}
-  .msg{padding:6px 10px;border-radius:10px;margin:4px 0;max-width:85%;font-size:.9rem}
+  .msg{padding:6px 10px;border-radius:10px;margin:4px 0;max-width:85%;font-size:.9rem;width:fit-content}
   .msg.patient{background:var(--vert-clair);margin-left:auto}
   .msg.pharmacie{background:#e5e7eb}
   .qr{display:flex;gap:12px;align-items:center;margin-top:8px;background:#f9fafb;padding:10px;border-radius:10px}
   .code{font-family:monospace;font-size:1.2rem;font-weight:700;letter-spacing:2px}
-  .etoiles button{background:none;border:0;font-size:1.4rem;cursor:pointer;color:#d1d5db;padding:0 2px}
-  .etoiles button.on{color:#f59e0b}
+  .etoiles button{background:none;border:0;font-size:1.4rem;cursor:pointer;color:#f59e0b;padding:0 2px}
   .barre{height:10px;background:var(--vert);border-radius:6px}
   .stat{display:grid;grid-template-columns:120px 1fr 30px;gap:8px;align-items:center;margin:6px 0;font-size:.9rem}
   .vide{color:var(--gris);font-style:italic}
   .cache{display:none}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:10px;font-size:.9rem;z-index:50;max-width:90%}
 </style>
 </head>
 <body>
 <header>
-  <h1>💊 TrouveMed</h1>
+  <h1>💊 TrouveMed <span id="etat" class="etat">connexion…</span></h1>
   <small>Trouvez votre médicament dans les pharmacies proches</small>
   <div class="modes">
     <button id="btnPatient" class="actif">Patient</button>
@@ -107,7 +112,9 @@
         <option value="1">1 km</option>
         <option value="3">3 km</option>
         <option value="5" selected>5 km</option>
+        <option value="20">20 km</option>
       </select>
+      <p class="meta" id="infoPosition">Position : centre de Casablanca (par défaut)</p>
 
       <div class="check"><input type="checkbox" id="urgent"><label for="urgent" style="margin:0">Urgent</label></div>
 
@@ -116,7 +123,7 @@
 
     <div class="carte">
       <h2>Mes demandes</h2>
-      <div id="mesDemandes"></div>
+      <div id="mesDemandes"><p class="vide">Chargement…</p></div>
     </div>
   </section>
 
@@ -126,6 +133,7 @@
       <h2>Je suis la pharmacie</h2>
       <select id="maPharmacie"></select>
       <p class="meta" id="infoPharmacie"></p>
+      <button class="btn sec petit" id="activerNotif">🔔 Activer les notifications</button>
     </div>
 
     <div class="carte">
@@ -141,38 +149,139 @@
 </main>
 
 <script>
-/* ---------- Données de démonstration (pharmacies fictives) ---------- */
-const PHARMACIES = [
-  {id:1, nom:"Pharmacie Al Amal",  adresse:"12 Bd Zerktouni, Casablanca",   tel:"0522000001", km:0.6, lat:33.5899, lng:-7.6290, ouvre:"08:30", ferme:"22:00"},
-  {id:2, nom:"Pharmacie Ennour",   adresse:"45 Rue Ibnou Mounir, Casablanca", tel:"0522000002", km:1.4, lat:33.5850, lng:-7.6350, ouvre:"09:00", ferme:"20:00"},
-  {id:3, nom:"Pharmacie Ibn Sina", adresse:"8 Av. Hassan II, Casablanca",    tel:"0522000003", km:2.3, lat:33.5920, lng:-7.6170, ouvre:"08:30", ferme:"21:00"},
-  {id:4, nom:"Pharmacie Atlas",    adresse:"102 Bd Abdelmoumen, Casablanca", tel:"0522000004", km:3.8, lat:33.5770, lng:-7.6240, ouvre:"09:00", ferme:"19:30"},
-  {id:5, nom:"Pharmacie de garde Anfa", adresse:"3 Bd d'Anfa, Casablanca",   tel:"0522000005", km:4.6, lat:33.5950, lng:-7.6400, ouvre:"00:00", ferme:"23:59"}
-];
+/* ================= Connexion Supabase ================= */
+const SUPABASE_URL = "https://hylkrtpvtsfdblxunyvg.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5bGtydHB2dHNmZGJseHVueXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5NDY1NzMsImV4cCI6MjExMDUyMjU3M30.BpPI7AX6qrd1MdrJPsMBCt884w7zl5M20qyekBuMN1Y";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ---------- Stockage local ---------- */
-const CLE = "trouvemed_v1";
-function charger(){
-  try{
-    const d = JSON.parse(localStorage.getItem(CLE));
-    if(d) return d;
-  }catch(e){}
-  return {demandes:[], points:0, notes:{}, profils:["Moi","Papa","Maman"]};
+/* ================= Préférences locales (cet appareil) ================= */
+const CLE = "trouvemed_local_v2";
+function lireLocal(){
+  try{ const d = JSON.parse(localStorage.getItem(CLE)); if(d) return d; }catch(e){}
+  return { clientId: "c_" + Math.random().toString(36).slice(2) + Date.now().toString(36),
+           points: 0, profils: ["Moi","Papa","Maman"], pharmacie: null, vus: [] };
 }
-let etat = charger();
-function sauver(){ try{ localStorage.setItem(CLE, JSON.stringify(etat)); }catch(e){ alert("Stockage plein (photo trop grande ?)"); } }
+let local = lireLocal();
+function sauverLocal(){ try{ localStorage.setItem(CLE, JSON.stringify(local)); }catch(e){} }
+sauverLocal();
 
-/* ---------- Outils ---------- */
+/* ================= Données en mémoire ================= */
+let PHARMACIES = [];
+let mesDemandes = [];      // demandes de ce patient
+let demandesPharma = [];   // demandes reçues par la pharmacie choisie
+let reponses = [];         // réponses liées aux demandes affichées
+let messages = [];         // messages liés aux demandes affichées
+let position = {lat:33.5883, lng:-7.6220, defaut:true};
+const chatsOuverts = new Set();
+
+/* ================= Outils ================= */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pharm = id => PHARMACIES.find(p => p.id === id);
-function heure(){ const d=new Date(); return d.getHours().toString().padStart(2,"0")+":"+d.getMinutes().toString().padStart(2,"0"); }
-function estOuverte(p){ const h=heure(); return h >= p.ouvre && h <= p.ferme; }
-function moyenneNote(id){ const n = etat.notes[id]||[]; return n.length ? (n.reduce((a,b)=>a+b,0)/n.length).toFixed(1) : null; }
-function cible(d){ return PHARMACIES.filter(p => p.km <= d.rayon && (estOuverte(p) || d.creeLe)).map(p=>p.id); }
+const hhmm = t => String(t||"").slice(0,5);
+function heure(){ const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function estOuverte(p){ const h=heure(); return h >= hhmm(p.ouvre) && h <= hhmm(p.ferme); }
+function distanceKm(a,b){
+  const R=6371, r=x=>x*Math.PI/180;
+  const dLat=r(b.lat-a.lat), dLng=r(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;
+  return +(2*R*Math.asin(Math.sqrt(s))).toFixed(1);
+}
+const km = p => distanceKm(position, p);
 function genererCode(){ return "TM-" + Math.random().toString(36).slice(2,8).toUpperCase(); }
+function toast(t){ const el=document.createElement("div"); el.className="toast"; el.textContent=t; document.body.appendChild(el); setTimeout(()=>el.remove(),3500); }
+function notifier(titre, texte){
+  toast(texte);
+  if("Notification" in window && Notification.permission==="granted"){
+    navigator.serviceWorker?.ready
+      .then(reg => reg.showNotification(titre, {body:texte, icon:"icon-192.png"}))
+      .catch(()=>{ try{ new Notification(titre,{body:texte}); }catch(e){} });
+  }
+}
+function erreur(e){ console.error(e); toast("Erreur : " + (e.message || e)); }
+function moyenneNote(pid){
+  const n = [...mesDemandes, ...demandesPharma].filter(d=>d.resa_pharmacie===pid && d.note).map(d=>d.note);
+  return n.length ? (n.reduce((a,b)=>a+b,0)/n.length).toFixed(1) : null;
+}
 
-/* ---------- Changement de mode ---------- */
+/* ================= Position du patient ================= */
+if("geolocation" in navigator){
+  navigator.geolocation.getCurrentPosition(p => {
+    position = {lat:p.coords.latitude, lng:p.coords.longitude, defaut:false};
+    $("infoPosition").textContent = "Position : votre emplacement actuel";
+    afficher();
+  }, () => {}, {timeout:8000});
+}
+
+/* ================= Chargement ================= */
+async function chargerPharmacies(){
+  const {data, error} = await db.from("pharmacies").select("*").order("id");
+  if(error) throw error;
+  PHARMACIES = data;
+  $("maPharmacie").innerHTML = PHARMACIES.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join("");
+  if(local.pharmacie && pharm(local.pharmacie)) $("maPharmacie").value = local.pharmacie;
+}
+
+async function chargerDonnees(){
+  const pid = parseInt($("maPharmacie").value);
+  const [a, b] = await Promise.all([
+    db.from("demandes").select("*").eq("client_id", local.clientId).order("created_at",{ascending:false}),
+    pid ? db.from("demandes").select("*").contains("ciblees",[pid]).order("created_at",{ascending:false}).limit(50) : {data:[]}
+  ]);
+  if(a.error) throw a.error; if(b.error) throw b.error;
+  mesDemandes = a.data; demandesPharma = b.data;
+  const ids = [...new Set([...mesDemandes, ...demandesPharma].map(d=>d.id))];
+  if(ids.length){
+    const [r, m] = await Promise.all([
+      db.from("reponses").select("*").in("demande_id", ids),
+      db.from("messages").select("*").in("demande_id", ids).order("created_at")
+    ]);
+    if(r.error) throw r.error; if(m.error) throw m.error;
+    reponses = r.data; messages = m.data;
+  } else { reponses = []; messages = []; }
+  afficher();
+}
+
+/* ================= Temps réel ================= */
+let rechargement = null;
+function recharger(){ clearTimeout(rechargement); rechargement = setTimeout(()=>chargerDonnees().catch(erreur), 300); }
+
+function ecouterTempsReel(){
+  db.channel("trouvemed")
+    .on("postgres_changes", {event:"*", schema:"public", table:"demandes"}, ev => {
+      const d = ev.new || {};
+      const pid = parseInt($("maPharmacie").value);
+      if(ev.eventType==="INSERT" && d.client_id!==local.clientId && (d.ciblees||[]).includes(pid)){
+        notifier("Nouvelle demande", `Un patient cherche « ${d.medicament} »${d.urgent?" (URGENT)":""}`);
+      }
+      recharger();
+    })
+    .on("postgres_changes", {event:"*", schema:"public", table:"reponses"}, ev => {
+      const r = ev.new || {};
+      const d = mesDemandes.find(x=>x.id===r.demande_id);
+      if(d && ev.eventType!=="DELETE"){
+        const p = pharm(r.pharmacie_id);
+        if(r.statut==="oui") notifier("Médicament disponible", `${p?.nom||"Une pharmacie"} a « ${d.medicament} » (${r.prix} DH)`);
+        else notifier("Réponse reçue", `${p?.nom||"Une pharmacie"} n'a pas « ${d.medicament} »`);
+      }
+      recharger();
+    })
+    .on("postgres_changes", {event:"INSERT", schema:"public", table:"messages"}, ev => {
+      const m = ev.new || {};
+      const pid = parseInt($("maPharmacie").value);
+      const mienne = mesDemandes.some(x=>x.id===m.demande_id);
+      if(m.de==="pharmacie" && mienne) notifier("Message de la pharmacie", m.texte);
+      if(m.de==="patient" && m.pharmacie_id===pid && !mienne) notifier("Message d'un patient", m.texte);
+      recharger();
+    })
+    .subscribe(statut => {
+      const ok = statut === "SUBSCRIBED";
+      $("etat").textContent = ok ? "en ligne" : "hors ligne";
+      $("etat").classList.toggle("ok", ok);
+    });
+}
+
+/* ================= Changement de mode ================= */
 $("btnPatient").onclick = () => basculer("patient");
 $("btnPharmacie").onclick = () => basculer("pharmacie");
 function basculer(m){
@@ -182,24 +291,28 @@ function basculer(m){
   $("vuePharmacie").classList.toggle("cache", m!=="pharmacie");
   afficher();
 }
-
-/* ---------- Profils famille ---------- */
-function remplirProfils(){
-  $("profil").innerHTML = etat.profils.map(p=>`<option>${esc(p)}</option>`).join("");
-}
-$("ajoutProfil").onclick = () => {
-  const n = prompt("Nom du profil (ex. Fils, Grand-mère) :");
-  if(n && n.trim()){ etat.profils.push(n.trim()); sauver(); remplirProfils(); $("profil").value = n.trim(); }
+$("maPharmacie").onchange = () => { local.pharmacie = parseInt($("maPharmacie").value); sauverLocal(); chargerDonnees().catch(erreur); };
+$("activerNotif").onclick = async () => {
+  if(!("Notification" in window)) return toast("Notifications non disponibles sur cet appareil.");
+  const r = await Notification.requestPermission();
+  toast(r==="granted" ? "Notifications activées" : "Notifications refusées");
 };
 
-/* ---------- Photo d'ordonnance (réduite pour le stockage) ---------- */
+/* ================= Profils famille ================= */
+function remplirProfils(){ $("profil").innerHTML = local.profils.map(p=>`<option>${esc(p)}</option>`).join(""); }
+$("ajoutProfil").onclick = () => {
+  const n = prompt("Nom du profil (ex. Fils, Grand-mère) :");
+  if(n && n.trim()){ local.profils.push(n.trim()); sauverLocal(); remplirProfils(); $("profil").value = n.trim(); }
+};
+
+/* ================= Photo d'ordonnance ================= */
 let photoOrdonnance = null;
 $("ordonnance").onchange = e => {
   const f = e.target.files[0]; if(!f) return;
   const img = new Image();
   img.onload = () => {
     const c = document.createElement("canvas");
-    const r = Math.min(1, 600 / Math.max(img.width, img.height));
+    const r = Math.min(1, 700 / Math.max(img.width, img.height));
     c.width = img.width*r; c.height = img.height*r;
     c.getContext("2d").drawImage(img,0,0,c.width,c.height);
     photoOrdonnance = c.toDataURL("image/jpeg", 0.6);
@@ -208,7 +321,7 @@ $("ordonnance").onchange = e => {
   img.src = URL.createObjectURL(f);
 };
 
-/* ---------- Saisie vocale ---------- */
+/* ================= Saisie vocale ================= */
 const Reco = window.SpeechRecognition || window.webkitSpeechRecognition;
 if(Reco){
   const reco = new Reco(); reco.lang = "fr-FR";
@@ -216,73 +329,91 @@ if(Reco){
   reco.onend = () => $("micro").classList.remove("ecoute");
   $("micro").onclick = () => { $("micro").classList.add("ecoute"); reco.start(); };
 }else{
-  $("micro").onclick = () => alert("La dictée vocale fonctionne dans Chrome.");
+  $("micro").onclick = () => toast("La dictée vocale fonctionne dans Chrome.");
 }
 
-/* ---------- Envoyer une demande ---------- */
-$("envoyer").onclick = () => {
+/* ================= Envoyer une demande ================= */
+$("envoyer").onclick = async () => {
   const med = $("medicament").value.trim();
-  if(!med && !photoOrdonnance){ alert("Indiquez un médicament ou une photo d'ordonnance."); return; }
+  if(!med && !photoOrdonnance) return toast("Indiquez un médicament ou une photo d'ordonnance.");
   const rayon = parseFloat($("rayon").value);
-  const ciblees = PHARMACIES.filter(p => p.km <= rayon && estOuverte(p)).map(p=>p.id);
-  if(!ciblees.length){ alert("Aucune pharmacie ouverte dans ce rayon. Essayez un rayon plus grand."); return; }
-  etat.demandes.unshift({
-    id: Date.now(), med: med || "Ordonnance (photo)", photo: photoOrdonnance,
-    profil: $("profil").value, urgent: $("urgent").checked, rayon, ciblees,
-    reponses:{}, alerte:false, reservation:null, chats:{}, recupere:false, creeLe:new Date().toISOString()
-  });
-  sauver();
-  $("medicament").value=""; $("urgent").checked=false; $("ordonnance").value="";
-  photoOrdonnance=null; $("apercu").classList.add("cache");
-  afficher();
+  const ciblees = PHARMACIES.filter(p => km(p) <= rayon && estOuverte(p)).map(p=>p.id);
+  if(!ciblees.length) return toast("Aucune pharmacie ouverte dans ce rayon. Essayez un rayon plus grand.");
+  $("envoyer").disabled = true;
+  try{
+    const {error} = await db.from("demandes").insert({
+      client_id: local.clientId, medicament: med || "Ordonnance (photo)", photo: photoOrdonnance,
+      profil: $("profil").value, urgent: $("urgent").checked, rayon, ciblees
+    });
+    if(error) throw error;
+    $("medicament").value=""; $("urgent").checked=false; $("ordonnance").value="";
+    photoOrdonnance=null; $("apercu").classList.add("cache");
+    toast(`Demande envoyée à ${ciblees.length} pharmacie(s)`);
+    if("Notification" in window && Notification.permission==="default") Notification.requestPermission();
+    await chargerDonnees();
+  }catch(e){ erreur(e); }
+  $("envoyer").disabled = false;
 };
 
-/* ---------- Affichage patient ---------- */
-function afficherPatient(){
-  $("points").textContent = etat.points;
-  const zone = $("mesDemandes");
-  if(!etat.demandes.length){ zone.innerHTML = `<p class="vide">Aucune demande pour l'instant.</p>`; return; }
+/* ================= Affichage patient ================= */
+function zoneChat(d, pid, qui){
+  const cle = d.id+"-"+pid;
+  if(!chatsOuverts.has(cle)) return "";
+  const msgs = messages.filter(m=>m.demande_id===d.id && m.pharmacie_id===pid)
+    .map(m=>`<div class="msg ${m.de}">${esc(m.texte)}</div>`).join("") || `<p class="meta">Posez votre question.</p>`;
+  return `<div class="chat">${msgs}
+    <div class="ligne" style="margin-top:6px">
+      <input id="saisie-${cle}-${qui}" placeholder="Votre message…" onkeydown="if(event.key==='Enter')envoyerMsg(${d.id},${pid},'${qui}')">
+      <button class="btn petit" style="flex:0 0 auto" onclick="envoyerMsg(${d.id},${pid},'${qui}')">Envoyer</button>
+    </div></div>`;
+}
 
-  zone.innerHTML = etat.demandes.map(d => {
+function afficherPatient(){
+  $("points").textContent = local.points;
+  const zone = $("mesDemandes");
+  if(!mesDemandes.length){ zone.innerHTML = `<p class="vide">Aucune demande pour l'instant.</p>`; return; }
+
+  zone.innerHTML = mesDemandes.map(d => {
     const reps = d.ciblees.map(pid => {
-      const p = pharm(pid), r = d.reponses[pid];
+      const p = pharm(pid); if(!p) return "";
+      const r = reponses.find(x=>x.demande_id===d.id && x.pharmacie_id===pid);
       const note = moyenneNote(pid);
-      let html = `<div class="rep"><strong>${esc(p.nom)}</strong> <span class="meta">· ${p.km} km${note?` · ★ ${note}`:""}</span><br>`;
+      let html = `<div class="rep"><strong>${esc(p.nom)}</strong> <span class="meta">· ${km(p)} km${note?` · ★ ${note}`:""}</span><br>`;
       if(!r){ html += `<span class="attente">⏳ En attente de réponse…</span>`; }
       else if(r.statut==="non"){
         html += `<span class="non">✗ Pas en stock</span>`;
         if(r.generique) html += `<div class="meta">Équivalent proposé : <strong>${esc(r.generique)}</strong></div>`;
       } else {
         html += `<span class="oui">✓ Disponible</span> <span class="meta">· ${esc(r.prix)} DH · gardé ${esc(r.garde)} h</span>
-          <div class="meta">${esc(p.adresse)} · ${p.ouvre}–${p.ferme}</div>
+          <div class="meta">${esc(p.adresse)} · ${hhmm(p.ouvre)}–${hhmm(p.ferme)}</div>
           <div class="actions">
-            <a class="btn" href="tel:${p.tel}">📞 Appeler</a>
-            <a class="btn" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}">🧭 Itinéraire</a>
-            ${!d.reservation ? `<button class="btn petit" onclick="reserver(${d.id},${pid})">Réserver</button>`:""}
-            <button class="btn sec petit" onclick="basculerChat(${d.id},${pid})">💬 Chat</button>
+            <a class="btn" href="tel:${esc(p.tel)}">📞 Appeler</a>
+            <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}">🧭 Itinéraire</a>
+            ${!d.resa_pharmacie ? `<button class="btn petit" onclick="reserver(${d.id},${pid})">Réserver</button>`:""}
           </div>`;
       }
+      html += `<div class="actions"><button class="btn sec petit" onclick="basculerChat(${d.id},${pid})">💬 Chat</button></div>`;
       html += zoneChat(d, pid, "patient");
-      if(d.reservation && d.reservation.pharmacie===pid){
+      if(d.resa_pharmacie===pid){
         html += `<div class="qr"><div id="qr-${d.id}"></div><div>
           <div class="meta">Code de retrait à montrer au pharmacien</div>
-          <div class="code">${d.reservation.code}</div>
+          <div class="code">${esc(d.resa_code)}</div>
           ${!d.recupere ? `<button class="btn petit" style="margin-top:6px" onclick="recuperer(${d.id})">J'ai récupéré (+10 pts)</button>`
             : (d.note ? `<div class="meta">Merci pour votre note ★ ${d.note}</div>` : `<div class="meta">Notez la pharmacie :</div>
-              <div class="etoiles">${[1,2,3,4,5].map(n=>`<button onclick="noter(${d.id},${pid},${n})">★</button>`).join("")}</div>`)}
+              <div class="etoiles">${[1,2,3,4,5].map(n=>`<button onclick="noter(${d.id},${n})">★</button>`).join("")}</div>`)}
         </div></div>`;
       }
       return html + `</div>`;
     }).join("");
 
-    const tousNon = d.ciblees.every(pid => d.reponses[pid] && d.reponses[pid].statut==="non");
+    const tousNon = d.ciblees.every(pid => reponses.some(x=>x.demande_id===d.id && x.pharmacie_id===pid && x.statut==="non"));
     const alerteBtn = tousNon ? (d.alerte
       ? `<p class="meta">🔔 Vous serez prévenu dès qu'une pharmacie l'a en stock.</p>`
       : `<button class="btn sec petit" onclick="activerAlerte(${d.id})">🔔 Me prévenir quand il est disponible</button>`) : "";
 
     return `<div class="demande">
       <div class="demande-tete">
-        <div><strong>${esc(d.med)}</strong><br><span class="meta">Pour : ${esc(d.profil)} · rayon ${d.rayon} km</span></div>
+        <div><strong>${esc(d.medicament)}</strong><br><span class="meta">Pour : ${esc(d.profil)} · rayon ${d.rayon} km · ${new Date(d.created_at).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})}</span></div>
         <div>${d.urgent?`<span class="tag urgent">Urgent</span>`:""}<span class="tag">${d.ciblees.length} pharmacie(s)</span></div>
       </div>
       ${d.photo?`<img src="${d.photo}" class="apercu" alt="Ordonnance">`:""}
@@ -292,94 +423,71 @@ function afficherPatient(){
     </div>`;
   }).join("");
 
-  // Dessiner les QR codes
-  etat.demandes.forEach(d => {
+  mesDemandes.forEach(d => {
     const el = document.getElementById("qr-"+d.id);
-    if(el && d.reservation){
-      if(window.QRCode) new QRCode(el, {text:d.reservation.code, width:90, height:90});
+    if(el && d.resa_code){
+      if(window.QRCode) new QRCode(el, {text:d.resa_code, width:90, height:90});
       else el.textContent = "▦";
     }
   });
 }
 
-/* ---------- Chat ---------- */
-const chatsOuverts = new Set();
-function zoneChat(d, pid, qui){
-  const cle = d.id+"-"+pid;
-  if(!chatsOuverts.has(cle)) return "";
-  const msgs = (d.chats[pid]||[]).map(m=>`<div class="msg ${m.de}">${esc(m.texte)}</div>`).join("") || `<p class="meta">Posez votre question.</p>`;
-  return `<div class="chat">${msgs}
-    <div class="ligne" style="margin-top:6px">
-      <input id="saisie-${cle}-${qui}" placeholder="Votre message…">
-      <button class="btn petit" style="flex:0 0 auto" onclick="envoyerMsg(${d.id},${pid},'${qui}')">Envoyer</button>
-    </div></div>`;
-}
+/* ================= Actions ================= */
 function basculerChat(did,pid){ const c=did+"-"+pid; chatsOuverts.has(c)?chatsOuverts.delete(c):chatsOuverts.add(c); afficher(); }
-function envoyerMsg(did,pid,qui){
+async function envoyerMsg(did,pid,qui){
   const champ = $("saisie-"+did+"-"+pid+"-"+qui); const t = champ.value.trim(); if(!t) return;
-  const d = etat.demandes.find(x=>x.id===did);
-  (d.chats[pid] = d.chats[pid]||[]).push({de:qui, texte:t});
-  sauver(); afficher();
+  champ.value = "";
+  const {error} = await db.from("messages").insert({demande_id:did, pharmacie_id:pid, de:qui, texte:t});
+  if(error) return erreur(error);
+  recharger();
 }
-
-/* ---------- Actions patient ---------- */
-function reserver(did,pid){
-  const d = etat.demandes.find(x=>x.id===did);
-  d.reservation = {pharmacie:pid, code:genererCode()};
-  sauver(); afficher();
+async function majDemande(did, champs){
+  const {error} = await db.from("demandes").update(champs).eq("id", did);
+  if(error) return erreur(error);
+  recharger();
 }
-function recuperer(did){
-  const d = etat.demandes.find(x=>x.id===did);
-  d.recupere = true; etat.points += 10; sauver(); afficher();
-}
-function noter(did,pid,n){
-  const d = etat.demandes.find(x=>x.id===did);
-  d.note = n; (etat.notes[pid]=etat.notes[pid]||[]).push(n); sauver(); afficher();
-}
-function activerAlerte(did){
-  const d = etat.demandes.find(x=>x.id===did);
-  d.alerte = true; sauver();
+const reserver = (did,pid) => majDemande(did, {resa_pharmacie:pid, resa_code:genererCode()});
+const recuperer = did => { local.points += 10; sauverLocal(); majDemande(did, {recupere:true}); };
+const noter = (did,n) => majDemande(did, {note:n});
+const activerAlerte = did => {
   if("Notification" in window && Notification.permission==="default") Notification.requestPermission();
-  afficher();
-}
-function supprimer(did){
+  majDemande(did, {alerte:true});
+};
+async function supprimer(did){
   if(!confirm("Supprimer cette demande ?")) return;
-  etat.demandes = etat.demandes.filter(x=>x.id!==did); sauver(); afficher();
+  const {error} = await db.from("demandes").delete().eq("id", did);
+  if(error) return erreur(error);
+  recharger();
 }
 
-/* ---------- Mode pharmacie ---------- */
-$("maPharmacie").innerHTML = PHARMACIES.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join("");
-$("maPharmacie").onchange = afficher;
-
+/* ================= Mode pharmacie ================= */
 function afficherPharmacie(){
   const pid = parseInt($("maPharmacie").value);
   const p = pharm(pid);
-  $("infoPharmacie").innerHTML = `${esc(p.adresse)} · ${p.ouvre}–${p.ferme} ·
+  if(!p){ $("demandesRecues").innerHTML = `<p class="vide">Chargement…</p>`; return; }
+  $("infoPharmacie").innerHTML = `${esc(p.adresse)} · ${hhmm(p.ouvre)}–${hhmm(p.ferme)} ·
     <span class="${estOuverte(p)?"ouvert":"ferme"}">${estOuverte(p)?"Ouverte":"Fermée"}</span>`;
 
-  const recues = etat.demandes.filter(d => d.ciblees.includes(pid))
-    .sort((a,b)=> (b.urgent-a.urgent) || (b.id-a.id));
+  const recues = [...demandesPharma].sort((a,b)=> (b.urgent-a.urgent) || (new Date(b.created_at)-new Date(a.created_at)));
 
   $("demandesRecues").innerHTML = recues.length ? recues.map(d => {
-    const r = d.reponses[pid];
+    const r = reponses.find(x=>x.demande_id===d.id && x.pharmacie_id===pid);
     const dejaRepondu = r ? `<p class="${r.statut==="oui"?"oui":"non"}">${r.statut==="oui"?`✓ Vous avez répondu : disponible (${esc(r.prix)} DH)`:"✗ Vous avez répondu : pas en stock"}</p>` : "";
-    const resa = d.reservation && d.reservation.pharmacie===pid
-      ? `<p class="tag" style="background:#dcfce7;color:#166534">Réservé · code ${d.reservation.code}${d.recupere?" · récupéré":""}</p>` : "";
+    const resa = d.resa_pharmacie===pid
+      ? `<p><span class="tag" style="background:#dcfce7;color:#166534">Réservé · code ${esc(d.resa_code)}${d.recupere?" · récupéré":""}</span></p>` : "";
     const form = (!r || (r.statut==="non" && d.alerte)) ? `
       <div class="ligne" style="margin-top:8px">
         <input id="prix-${d.id}" type="number" placeholder="Prix (DH)">
         <select id="garde-${d.id}"><option value="1">Gardé 1 h</option><option value="2">Gardé 2 h</option><option value="24">Gardé 24 h</option></select>
       </div>
-      <div class="actions">
-        <button class="btn petit" onclick="repondre(${d.id},${pid},'oui')">✓ Oui, disponible</button>
-      </div>
+      <div class="actions"><button class="btn petit" onclick="repondre(${d.id},${pid},'oui')">✓ Oui, disponible</button></div>
       ${!r?`<div class="ligne" style="margin-top:6px">
         <input id="gen-${d.id}" placeholder="Équivalent à proposer (facultatif)">
         <button class="btn rouge petit" style="flex:0 0 auto" onclick="repondre(${d.id},${pid},'non')">✗ Non</button>
       </div>`:""}` : "";
-    return `<div class="demande">
+    return `<div class="demande ${!r?"nouvelle":""}">
       <div class="demande-tete">
-        <strong>${esc(d.med)}</strong>
+        <div><strong>${esc(d.medicament)}</strong><br><span class="meta">${new Date(d.created_at).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})}</span></div>
         <div>${d.urgent?`<span class="tag urgent">Urgent</span>`:""}${d.alerte?`<span class="tag">Patient en attente</span>`:""}</div>
       </div>
       ${d.photo?`<img src="${d.photo}" class="apercu" alt="Ordonnance">`:""}
@@ -389,9 +497,8 @@ function afficherPharmacie(){
     </div>`;
   }).join("") : `<p class="vide">Aucune demande pour le moment.</p>`;
 
-  // Tableau de bord : médicaments les plus demandés
   const compte = {};
-  etat.demandes.forEach(d => { const n = d.med.toLowerCase(); compte[n]=(compte[n]||0)+1; });
+  demandesPharma.forEach(d => { const n = d.medicament.toLowerCase(); compte[n]=(compte[n]||0)+1; });
   const top = Object.entries(compte).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const max = top.length ? top[0][1] : 1;
   $("tableauBord").innerHTML = top.length ? top.map(([n,c]) =>
@@ -399,39 +506,41 @@ function afficherPharmacie(){
   ).join("") : `<p class="vide">Pas encore de données.</p>`;
 }
 
-function repondre(did,pid,statut){
-  const d = etat.demandes.find(x=>x.id===did);
+async function repondre(did,pid,statut){
+  let ligne;
   if(statut==="oui"){
     const prix = $("prix-"+did).value;
-    if(!prix){ alert("Indiquez le prix."); return; }
-    d.reponses[pid] = {statut:"oui", prix, garde:$("garde-"+did).value};
-    if(d.alerte){
-      const msg = `${pharm(pid).nom} a maintenant « ${d.med} » en stock !`;
-      d.messageAlerte = msg;
-      if("Notification" in window && Notification.permission==="granted") new Notification("TrouveMed", {body:msg});
-    }
+    if(!prix) return toast("Indiquez le prix.");
+    ligne = {demande_id:did, pharmacie_id:pid, statut:"oui", prix:+prix, garde:+$("garde-"+did).value, generique:null};
   } else {
-    d.reponses[pid] = {statut:"non", generique:$("gen-"+did).value.trim()};
+    ligne = {demande_id:did, pharmacie_id:pid, statut:"non", prix:null, garde:null, generique:$("gen-"+did).value.trim() || null};
   }
-  sauver(); afficher();
+  const {error} = await db.from("reponses").upsert(ligne, {onConflict:"demande_id,pharmacie_id"});
+  if(error) return erreur(error);
+  toast("Réponse envoyée au patient");
+  recharger();
 }
 
-/* ---------- Affichage général ---------- */
+/* ================= Affichage général ================= */
 function afficher(){
-  const alertes = etat.demandes.filter(d=>d.messageAlerte && !d.alerteVue);
-  if(alertes.length && !$("vuePatient").classList.contains("cache")){
-    $("bandeau").textContent = "🔔 " + alertes.map(d=>d.messageAlerte).join(" · ");
-    $("bandeau").classList.remove("cache");
-    alertes.forEach(d=>d.alerteVue=true); sauver();
-  }
   if(!$("vuePatient").classList.contains("cache")) afficherPatient();
   else afficherPharmacie();
 }
 
+/* ================= Démarrage ================= */
 remplirProfils();
-afficher();
+(async () => {
+  try{
+    await chargerPharmacies();
+    await chargerDonnees();
+    ecouterTempsReel();
+  }catch(e){
+    $("etat").textContent = "hors ligne";
+    $("mesDemandes").innerHTML = `<p class="vide">Impossible de joindre le serveur. Vérifiez votre connexion.</p>`;
+    erreur(e);
+  }
+})();
 
-/* ---------- PWA : fonctionnement hors ligne ---------- */
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
