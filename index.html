@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrouveMed</title>
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --vert:#0f766e; --vert-clair:#ccfbf1; --rouge:#b91c1c; --rouge-clair:#fee2e2;
+    --orange:#c2410c; --fond:#f1f5f4; --carte:#ffffff; --texte:#1f2937; --gris:#6b7280; --bord:#e5e7eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--fond);color:var(--texte)}
+  header{background:var(--vert);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:10}
+  header h1{margin:0;font-size:1.3rem}
+  header small{opacity:.85}
+  .modes{display:flex;gap:8px;margin-top:10px}
+  .modes button{flex:1;padding:9px;border:0;border-radius:10px;background:rgba(255,255,255,.18);color:#fff;font-weight:600;cursor:pointer}
+  .modes button.actif{background:#fff;color:var(--vert)}
+  main{max-width:720px;margin:0 auto;padding:16px}
+  .carte{background:var(--carte);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .carte h2{margin:0 0 12px;font-size:1.05rem}
+  label{display:block;font-size:.85rem;color:var(--gris);margin:10px 0 4px}
+  input,select,textarea{width:100%;padding:10px;border:1px solid var(--bord);border-radius:10px;font-size:1rem;font-family:inherit}
+  .ligne{display:flex;gap:8px;align-items:center}
+  .ligne > *{flex:1}
+  button.btn{padding:10px 14px;border:0;border-radius:10px;background:var(--vert);color:#fff;font-weight:600;cursor:pointer;font-size:.95rem}
+  button.btn.sec{background:#e6f4f1;color:var(--vert)}
+  button.btn.rouge{background:var(--rouge)}
+  button.btn.petit{padding:6px 10px;font-size:.85rem}
+  a.btn{display:inline-block;text-decoration:none;padding:6px 10px;border-radius:10px;background:#e6f4f1;color:var(--vert);font-weight:600;font-size:.85rem}
+  .micro{flex:0 0 46px;height:44px;border-radius:10px;border:1px solid var(--bord);background:#fff;font-size:1.2rem;cursor:pointer}
+  .micro.ecoute{background:var(--rouge-clair);border-color:var(--rouge)}
+  .check{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .check input{width:auto}
+  .apercu{max-width:120px;border-radius:8px;margin-top:8px;display:block}
+  .demande{border:1px solid var(--bord);border-radius:12px;padding:12px;margin-bottom:12px}
+  .demande-tete{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .tag{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;margin-right:4px}
+  .tag.urgent{background:var(--rouge-clair);color:var(--rouge)}
+  .rep{border-top:1px dashed var(--bord);padding:10px 0 4px;margin-top:8px}
+  .oui{color:var(--vert);font-weight:700}
+  .non{color:var(--rouge);font-weight:700}
+  .attente{color:var(--gris)}
+  .actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .meta{font-size:.82rem;color:var(--gris)}
+  .ouvert{color:var(--vert)} .ferme{color:var(--rouge)}
+  .points{background:var(--vert-clair);color:var(--vert);border-radius:12px;padding:10px 14px;font-weight:600;margin-bottom:14px}
+  .bandeau{background:#fef3c7;color:#92400e;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-weight:600}
+  .chat{background:#f9fafb;border-radius:10px;padding:8px;margin-top:8px}
+  .msg{padding:6px 10px;border-radius:10px;margin:4px 0;max-width:85%;font-size:.9rem}
+  .msg.patient{background:var(--vert-clair);margin-left:auto}
+  .msg.pharmacie{background:#e5e7eb}
+  .qr{display:flex;gap:12px;align-items:center;margin-top:8px;background:#f9fafb;padding:10px;border-radius:10px}
+  .code{font-family:monospace;font-size:1.2rem;font-weight:700;letter-spacing:2px}
+  .etoiles button{background:none;border:0;font-size:1.4rem;cursor:pointer;color:#d1d5db;padding:0 2px}
+  .etoiles button.on{color:#f59e0b}
+  .barre{height:10px;background:var(--vert);border-radius:6px}
+  .stat{display:grid;grid-template-columns:120px 1fr 30px;gap:8px;align-items:center;margin:6px 0;font-size:.9rem}
+  .vide{color:var(--gris);font-style:italic}
+  .cache{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>💊 TrouveMed</h1>
+  <small>Trouvez votre médicament dans les pharmacies proches</small>
+  <div class="modes">
+    <button id="btnPatient" class="actif">Patient</button>
+    <button id="btnPharmacie">Pharmacie</button>
+  </div>
+</header>
+
+<main>
+  <!-- ===== MODE PATIENT ===== -->
+  <section id="vuePatient">
+    <div id="bandeau" class="bandeau cache"></div>
+    <div class="points">⭐ Points fidélité : <span id="points">0</span></div>
+
+    <div class="carte">
+      <h2>Rechercher un médicament</h2>
+      <label>Pour qui ?</label>
+      <div class="ligne">
+        <select id="profil"></select>
+        <button class="btn sec petit" id="ajoutProfil" style="flex:0 0 auto">+ Profil</button>
+      </div>
+
+      <label>Nom du médicament</label>
+      <div class="ligne">
+        <input id="medicament" placeholder="ex. Augmentin 1g">
+        <button class="micro" id="micro" title="Dicter">🎤</button>
+      </div>
+
+      <label>Ou photo de l'ordonnance</label>
+      <input type="file" id="ordonnance" accept="image/*" capture="environment">
+      <img id="apercu" class="apercu cache" alt="Ordonnance">
+
+      <label>Rayon de recherche</label>
+      <select id="rayon">
+        <option value="1">1 km</option>
+        <option value="3">3 km</option>
+        <option value="5" selected>5 km</option>
+      </select>
+
+      <div class="check"><input type="checkbox" id="urgent"><label for="urgent" style="margin:0">Urgent</label></div>
+
+      <div style="margin-top:14px"><button class="btn" id="envoyer">Envoyer la demande</button></div>
+    </div>
+
+    <div class="carte">
+      <h2>Mes demandes</h2>
+      <div id="mesDemandes"></div>
+    </div>
+  </section>
+
+  <!-- ===== MODE PHARMACIE ===== -->
+  <section id="vuePharmacie" class="cache">
+    <div class="carte">
+      <h2>Je suis la pharmacie</h2>
+      <select id="maPharmacie"></select>
+      <p class="meta" id="infoPharmacie"></p>
+    </div>
+
+    <div class="carte">
+      <h2>Demandes reçues</h2>
+      <div id="demandesRecues"></div>
+    </div>
+
+    <div class="carte">
+      <h2>📊 Médicaments les plus demandés</h2>
+      <div id="tableauBord"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ---------- Données de démonstration (pharmacies fictives) ---------- */
+const PHARMACIES = [
+  {id:1, nom:"Pharmacie Al Amal",  adresse:"12 Bd Zerktouni, Casablanca",   tel:"0522000001", km:0.6, lat:33.5899, lng:-7.6290, ouvre:"08:30", ferme:"22:00"},
+  {id:2, nom:"Pharmacie Ennour",   adresse:"45 Rue Ibnou Mounir, Casablanca", tel:"0522000002", km:1.4, lat:33.5850, lng:-7.6350, ouvre:"09:00", ferme:"20:00"},
+  {id:3, nom:"Pharmacie Ibn Sina", adresse:"8 Av. Hassan II, Casablanca",    tel:"0522000003", km:2.3, lat:33.5920, lng:-7.6170, ouvre:"08:30", ferme:"21:00"},
+  {id:4, nom:"Pharmacie Atlas",    adresse:"102 Bd Abdelmoumen, Casablanca", tel:"0522000004", km:3.8, lat:33.5770, lng:-7.6240, ouvre:"09:00", ferme:"19:30"},
+  {id:5, nom:"Pharmacie de garde Anfa", adresse:"3 Bd d'Anfa, Casablanca",   tel:"0522000005", km:4.6, lat:33.5950, lng:-7.6400, ouvre:"00:00", ferme:"23:59"}
+];
+
+/* ---------- Stockage local ---------- */
+const CLE = "trouvemed_v1";
+function charger(){
+  try{
+    const d = JSON.parse(localStorage.getItem(CLE));
+    if(d) return d;
+  }catch(e){}
+  return {demandes:[], points:0, notes:{}, profils:["Moi","Papa","Maman"]};
+}
+let etat = charger();
+function sauver(){ try{ localStorage.setItem(CLE, JSON.stringify(etat)); }catch(e){ alert("Stockage plein (photo trop grande ?)"); } }
+
+/* ---------- Outils ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pharm = id => PHARMACIES.find(p => p.id === id);
+function heure(){ const d=new Date(); return d.getHours().toString().padStart(2,"0")+":"+d.getMinutes().toString().padStart(2,"0"); }
+function estOuverte(p){ const h=heure(); return h >= p.ouvre && h <= p.ferme; }
+function moyenneNote(id){ const n = etat.notes[id]||[]; return n.length ? (n.reduce((a,b)=>a+b,0)/n.length).toFixed(1) : null; }
+function cible(d){ return PHARMACIES.filter(p => p.km <= d.rayon && (estOuverte(p) || d.creeLe)).map(p=>p.id); }
+function genererCode(){ return "TM-" + Math.random().toString(36).slice(2,8).toUpperCase(); }
+
+/* ---------- Changement de mode ---------- */
+$("btnPatient").onclick = () => basculer("patient");
+$("btnPharmacie").onclick = () => basculer("pharmacie");
+function basculer(m){
+  $("btnPatient").classList.toggle("actif", m==="patient");
+  $("btnPharmacie").classList.toggle("actif", m==="pharmacie");
+  $("vuePatient").classList.toggle("cache", m!=="patient");
+  $("vuePharmacie").classList.toggle("cache", m!=="pharmacie");
+  afficher();
+}
+
+/* ---------- Profils famille ---------- */
+function remplirProfils(){
+  $("profil").innerHTML = etat.profils.map(p=>`<option>${esc(p)}</option>`).join("");
+}
+$("ajoutProfil").onclick = () => {
+  const n = prompt("Nom du profil (ex. Fils, Grand-mère) :");
+  if(n && n.trim()){ etat.profils.push(n.trim()); sauver(); remplirProfils(); $("profil").value = n.trim(); }
+};
+
+/* ---------- Photo d'ordonnance (réduite pour le stockage) ---------- */
+let photoOrdonnance = null;
+$("ordonnance").onchange = e => {
+  const f = e.target.files[0]; if(!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas");
+    const r = Math.min(1, 600 / Math.max(img.width, img.height));
+    c.width = img.width*r; c.height = img.height*r;
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    photoOrdonnance = c.toDataURL("image/jpeg", 0.6);
+    $("apercu").src = photoOrdonnance; $("apercu").classList.remove("cache");
+  };
+  img.src = URL.createObjectURL(f);
+};
+
+/* ---------- Saisie vocale ---------- */
+const Reco = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(Reco){
+  const reco = new Reco(); reco.lang = "fr-FR";
+  reco.onresult = e => { $("medicament").value = e.results[0][0].transcript; };
+  reco.onend = () => $("micro").classList.remove("ecoute");
+  $("micro").onclick = () => { $("micro").classList.add("ecoute"); reco.start(); };
+}else{
+  $("micro").onclick = () => alert("La dictée vocale fonctionne dans Chrome.");
+}
+
+/* ---------- Envoyer une demande ---------- */
+$("envoyer").onclick = () => {
+  const med = $("medicament").value.trim();
+  if(!med && !photoOrdonnance){ alert("Indiquez un médicament ou une photo d'ordonnance."); return; }
+  const rayon = parseFloat($("rayon").value);
+  const ciblees = PHARMACIES.filter(p => p.km <= rayon && estOuverte(p)).map(p=>p.id);
+  if(!ciblees.length){ alert("Aucune pharmacie ouverte dans ce rayon. Essayez un rayon plus grand."); return; }
+  etat.demandes.unshift({
+    id: Date.now(), med: med || "Ordonnance (photo)", photo: photoOrdonnance,
+    profil: $("profil").value, urgent: $("urgent").checked, rayon, ciblees,
+    reponses:{}, alerte:false, reservation:null, chats:{}, recupere:false, creeLe:new Date().toISOString()
+  });
+  sauver();
+  $("medicament").value=""; $("urgent").checked=false; $("ordonnance").value="";
+  photoOrdonnance=null; $("apercu").classList.add("cache");
+  afficher();
+};
+
+/* ---------- Affichage patient ---------- */
+function afficherPatient(){
+  $("points").textContent = etat.points;
+  const zone = $("mesDemandes");
+  if(!etat.demandes.length){ zone.innerHTML = `<p class="vide">Aucune demande pour l'instant.</p>`; return; }
+
+  zone.innerHTML = etat.demandes.map(d => {
+    const reps = d.ciblees.map(pid => {
+      const p = pharm(pid), r = d.reponses[pid];
+      const note = moyenneNote(pid);
+      let html = `<div class="rep"><strong>${esc(p.nom)}</strong> <span class="meta">· ${p.km} km${note?` · ★ ${note}`:""}</span><br>`;
+      if(!r){ html += `<span class="attente">⏳ En attente de réponse…</span>`; }
+      else if(r.statut==="non"){
+        html += `<span class="non">✗ Pas en stock</span>`;
+        if(r.generique) html += `<div class="meta">Équivalent proposé : <strong>${esc(r.generique)}</strong></div>`;
+      } else {
+        html += `<span class="oui">✓ Disponible</span> <span class="meta">· ${esc(r.prix)} DH · gardé ${esc(r.garde)} h</span>
+          <div class="meta">${esc(p.adresse)} · ${p.ouvre}–${p.ferme}</div>
+          <div class="actions">
+            <a class="btn" href="tel:${p.tel}">📞 Appeler</a>
+            <a class="btn" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}">🧭 Itinéraire</a>
+            ${!d.reservation ? `<button class="btn petit" onclick="reserver(${d.id},${pid})">Réserver</button>`:""}
+            <button class="btn sec petit" onclick="basculerChat(${d.id},${pid})">💬 Chat</button>
+          </div>`;
+      }
+      html += zoneChat(d, pid, "patient");
+      if(d.reservation && d.reservation.pharmacie===pid){
+        html += `<div class="qr"><div id="qr-${d.id}"></div><div>
+          <div class="meta">Code de retrait à montrer au pharmacien</div>
+          <div class="code">${d.reservation.code}</div>
+          ${!d.recupere ? `<button class="btn petit" style="margin-top:6px" onclick="recuperer(${d.id})">J'ai récupéré (+10 pts)</button>`
+            : (d.note ? `<div class="meta">Merci pour votre note ★ ${d.note}</div>` : `<div class="meta">Notez la pharmacie :</div>
+              <div class="etoiles">${[1,2,3,4,5].map(n=>`<button onclick="noter(${d.id},${pid},${n})">★</button>`).join("")}</div>`)}
+        </div></div>`;
+      }
+      return html + `</div>`;
+    }).join("");
+
+    const tousNon = d.ciblees.every(pid => d.reponses[pid] && d.reponses[pid].statut==="non");
+    const alerteBtn = tousNon ? (d.alerte
+      ? `<p class="meta">🔔 Vous serez prévenu dès qu'une pharmacie l'a en stock.</p>`
+      : `<button class="btn sec petit" onclick="activerAlerte(${d.id})">🔔 Me prévenir quand il est disponible</button>`) : "";
+
+    return `<div class="demande">
+      <div class="demande-tete">
+        <div><strong>${esc(d.med)}</strong><br><span class="meta">Pour : ${esc(d.profil)} · rayon ${d.rayon} km</span></div>
+        <div>${d.urgent?`<span class="tag urgent">Urgent</span>`:""}<span class="tag">${d.ciblees.length} pharmacie(s)</span></div>
+      </div>
+      ${d.photo?`<img src="${d.photo}" class="apercu" alt="Ordonnance">`:""}
+      ${reps}
+      <div style="margin-top:8px">${alerteBtn}</div>
+      <div class="actions"><button class="btn rouge petit" onclick="supprimer(${d.id})">Supprimer</button></div>
+    </div>`;
+  }).join("");
+
+  // Dessiner les QR codes
+  etat.demandes.forEach(d => {
+    const el = document.getElementById("qr-"+d.id);
+    if(el && d.reservation){
+      if(window.QRCode) new QRCode(el, {text:d.reservation.code, width:90, height:90});
+      else el.textContent = "▦";
+    }
+  });
+}
+
+/* ---------- Chat ---------- */
+const chatsOuverts = new Set();
+function zoneChat(d, pid, qui){
+  const cle = d.id+"-"+pid;
+  if(!chatsOuverts.has(cle)) return "";
+  const msgs = (d.chats[pid]||[]).map(m=>`<div class="msg ${m.de}">${esc(m.texte)}</div>`).join("") || `<p class="meta">Posez votre question.</p>`;
+  return `<div class="chat">${msgs}
+    <div class="ligne" style="margin-top:6px">
+      <input id="saisie-${cle}-${qui}" placeholder="Votre message…">
+      <button class="btn petit" style="flex:0 0 auto" onclick="envoyerMsg(${d.id},${pid},'${qui}')">Envoyer</button>
+    </div></div>`;
+}
+function basculerChat(did,pid){ const c=did+"-"+pid; chatsOuverts.has(c)?chatsOuverts.delete(c):chatsOuverts.add(c); afficher(); }
+function envoyerMsg(did,pid,qui){
+  const champ = $("saisie-"+did+"-"+pid+"-"+qui); const t = champ.value.trim(); if(!t) return;
+  const d = etat.demandes.find(x=>x.id===did);
+  (d.chats[pid] = d.chats[pid]||[]).push({de:qui, texte:t});
+  sauver(); afficher();
+}
+
+/* ---------- Actions patient ---------- */
+function reserver(did,pid){
+  const d = etat.demandes.find(x=>x.id===did);
+  d.reservation = {pharmacie:pid, code:genererCode()};
+  sauver(); afficher();
+}
+function recuperer(did){
+  const d = etat.demandes.find(x=>x.id===did);
+  d.recupere = true; etat.points += 10; sauver(); afficher();
+}
+function noter(did,pid,n){
+  const d = etat.demandes.find(x=>x.id===did);
+  d.note = n; (etat.notes[pid]=etat.notes[pid]||[]).push(n); sauver(); afficher();
+}
+function activerAlerte(did){
+  const d = etat.demandes.find(x=>x.id===did);
+  d.alerte = true; sauver();
+  if("Notification" in window && Notification.permission==="default") Notification.requestPermission();
+  afficher();
+}
+function supprimer(did){
+  if(!confirm("Supprimer cette demande ?")) return;
+  etat.demandes = etat.demandes.filter(x=>x.id!==did); sauver(); afficher();
+}
+
+/* ---------- Mode pharmacie ---------- */
+$("maPharmacie").innerHTML = PHARMACIES.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join("");
+$("maPharmacie").onchange = afficher;
+
+function afficherPharmacie(){
+  const pid = parseInt($("maPharmacie").value);
+  const p = pharm(pid);
+  $("infoPharmacie").innerHTML = `${esc(p.adresse)} · ${p.ouvre}–${p.ferme} ·
+    <span class="${estOuverte(p)?"ouvert":"ferme"}">${estOuverte(p)?"Ouverte":"Fermée"}</span>`;
+
+  const recues = etat.demandes.filter(d => d.ciblees.includes(pid))
+    .sort((a,b)=> (b.urgent-a.urgent) || (b.id-a.id));
+
+  $("demandesRecues").innerHTML = recues.length ? recues.map(d => {
+    const r = d.reponses[pid];
+    const dejaRepondu = r ? `<p class="${r.statut==="oui"?"oui":"non"}">${r.statut==="oui"?`✓ Vous avez répondu : disponible (${esc(r.prix)} DH)`:"✗ Vous avez répondu : pas en stock"}</p>` : "";
+    const resa = d.reservation && d.reservation.pharmacie===pid
+      ? `<p class="tag" style="background:#dcfce7;color:#166534">Réservé · code ${d.reservation.code}${d.recupere?" · récupéré":""}</p>` : "";
+    const form = (!r || (r.statut==="non" && d.alerte)) ? `
+      <div class="ligne" style="margin-top:8px">
+        <input id="prix-${d.id}" type="number" placeholder="Prix (DH)">
+        <select id="garde-${d.id}"><option value="1">Gardé 1 h</option><option value="2">Gardé 2 h</option><option value="24">Gardé 24 h</option></select>
+      </div>
+      <div class="actions">
+        <button class="btn petit" onclick="repondre(${d.id},${pid},'oui')">✓ Oui, disponible</button>
+      </div>
+      ${!r?`<div class="ligne" style="margin-top:6px">
+        <input id="gen-${d.id}" placeholder="Équivalent à proposer (facultatif)">
+        <button class="btn rouge petit" style="flex:0 0 auto" onclick="repondre(${d.id},${pid},'non')">✗ Non</button>
+      </div>`:""}` : "";
+    return `<div class="demande">
+      <div class="demande-tete">
+        <strong>${esc(d.med)}</strong>
+        <div>${d.urgent?`<span class="tag urgent">Urgent</span>`:""}${d.alerte?`<span class="tag">Patient en attente</span>`:""}</div>
+      </div>
+      ${d.photo?`<img src="${d.photo}" class="apercu" alt="Ordonnance">`:""}
+      ${dejaRepondu}${resa}${form}
+      <div class="actions"><button class="btn sec petit" onclick="basculerChat(${d.id},${pid})">💬 Chat avec le patient</button></div>
+      ${zoneChat(d, pid, "pharmacie")}
+    </div>`;
+  }).join("") : `<p class="vide">Aucune demande pour le moment.</p>`;
+
+  // Tableau de bord : médicaments les plus demandés
+  const compte = {};
+  etat.demandes.forEach(d => { const n = d.med.toLowerCase(); compte[n]=(compte[n]||0)+1; });
+  const top = Object.entries(compte).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const max = top.length ? top[0][1] : 1;
+  $("tableauBord").innerHTML = top.length ? top.map(([n,c]) =>
+    `<div class="stat"><span>${esc(n)}</span><div class="barre" style="width:${c/max*100}%"></div><span>${c}</span></div>`
+  ).join("") : `<p class="vide">Pas encore de données.</p>`;
+}
+
+function repondre(did,pid,statut){
+  const d = etat.demandes.find(x=>x.id===did);
+  if(statut==="oui"){
+    const prix = $("prix-"+did).value;
+    if(!prix){ alert("Indiquez le prix."); return; }
+    d.reponses[pid] = {statut:"oui", prix, garde:$("garde-"+did).value};
+    if(d.alerte){
+      const msg = `${pharm(pid).nom} a maintenant « ${d.med} » en stock !`;
+      d.messageAlerte = msg;
+      if("Notification" in window && Notification.permission==="granted") new Notification("TrouveMed", {body:msg});
+    }
+  } else {
+    d.reponses[pid] = {statut:"non", generique:$("gen-"+did).value.trim()};
+  }
+  sauver(); afficher();
+}
+
+/* ---------- Affichage général ---------- */
+function afficher(){
+  const alertes = etat.demandes.filter(d=>d.messageAlerte && !d.alerteVue);
+  if(alertes.length && !$("vuePatient").classList.contains("cache")){
+    $("bandeau").textContent = "🔔 " + alertes.map(d=>d.messageAlerte).join(" · ");
+    $("bandeau").classList.remove("cache");
+    alertes.forEach(d=>d.alerteVue=true); sauver();
+  }
+  if(!$("vuePatient").classList.contains("cache")) afficherPatient();
+  else afficherPharmacie();
+}
+
+remplirProfils();
+afficher();
+
+/* ---------- PWA : fonctionnement hors ligne ---------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
